@@ -4,7 +4,9 @@ const { Sequelize, DataTypes } = require('sequelize');
 require('dotenv').config(); // Carrega as variáveis de ambiente
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000
+
+
 
 // Habilitando CORS
 app.use(cors());

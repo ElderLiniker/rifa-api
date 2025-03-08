@@ -13,11 +13,11 @@ app.use(cors());
 app.use(express.json()); // Para analisar corpos JSON
 
 // Configuração do Sequelize e conexão com o PostgreSQL
-const sequelize = new Sequelize('rifa_db', 'user', 'password', {
-  host: 'localhost',
+const sequelize = new Sequelize(process.env.DB_URL, {
   dialect: 'postgres',
-  port: 5434, // Use a mesma porta que você configurou no Docker
 });
+
+
 
 // Modelo para as reservas
 const Reserva = sequelize.define('Reserva', {
@@ -36,6 +36,11 @@ const Reserva = sequelize.define('Reserva', {
 sequelize.authenticate()
   .then(() => console.log('Conexão com o banco de dados bem-sucedida.'))
   .catch(err => console.error('Erro ao conectar ao banco de dados:', err));
+
+
+  app.get("/", (req, res) => {
+    res.send("API funcionando na Vercel!");
+  });
 
 // Rota para login do admin
 app.post('/admin/login', (req, res) => {
@@ -74,6 +79,17 @@ app.post('/reservas', async (req, res) => {
     res.status(500).json({ message: 'Erro ao fazer reserva' });
   }
 });
+// Rota para limpar todas as reservas (limpar a rifa)
+app.delete('/reservas', async (req, res) => {
+  try {
+    await Reserva.destroy({ where: {} });  // Apaga todas as reservas
+    res.json({ message: 'Rifa limpa com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao limpar rifa:', error);
+    res.status(500).json({ message: 'Erro ao limpar rifa' });
+  }
+});
+
 
 // Rota para marcar como pago
 app.put('/reservas/:numero/pago', async (req, res) => {
@@ -93,6 +109,27 @@ app.put('/reservas/:numero/pago', async (req, res) => {
     res.status(500).json({ message: 'Erro ao marcar como pago' });
   }
 });
+
+// Rota para marcar como não pago
+// Rota para marcar uma reserva como "Não Pago"
+app.put('/reservas/:numero/nao-pago', async (req, res) => {
+  try {
+    const { numero } = req.params;
+    const reserva = await Reserva.findOne({ where: { numero } });
+
+    if (reserva) {
+      reserva.pago = false;  // Marca como não pago
+      await reserva.save();   // Salva a alteração no banco de dados
+      res.json({ message: 'Reserva marcada como não paga!' });
+    } else {
+      res.status(404).json({ message: 'Reserva não encontrada' });
+    }
+  } catch (error) {
+    console.error('Erro ao marcar como não pago:', error);
+    res.status(500).json({ message: 'Erro ao marcar como não pago' });
+  }
+});
+
 
 // Rota para excluir número reservado
 app.delete('/reservas/:numero', async (req, res) => {

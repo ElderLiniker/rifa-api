@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "engines": {
-    "node": "22.x"
-  },
+  "node": "20.x"
+},
   "scripts": {
     "start": "node index.js",
+  "build": "npm install",
     "vercel-build": "npx sequelize-cli db:migrate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -16,6 +17,7 @@
   "description": "",
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "pg": "^8.13.3",
     "pg-hstore": "^2.3.4",

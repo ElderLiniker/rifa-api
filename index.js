@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { Sequelize, DataTypes } = require('sequelize');
+
 require('dotenv').config(); // Carrega as variáveis de ambiente
 
 const app = express();

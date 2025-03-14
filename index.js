@@ -13,9 +13,13 @@ app.use(cors());
 app.use(express.json()); // Para analisar corpos JSON
 
 // Configuração do Sequelize e conexão com o PostgreSQL
-const sequelize = new Sequelize(process.env.DB_URL, {
+const { DB_URL } = process.env;
+
+const sequelize = new Sequelize(DB_URL, {
   dialect: 'postgres',
+  protocol: 'postgres',
 });
+
 
 
 

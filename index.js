@@ -13,12 +13,28 @@ app.use(cors());
 app.use(express.json()); // Para analisar corpos JSON
 
 // Configuração do Sequelize e conexão com o PostgreSQL
-const { DB_URL } = process.env;
+const { Sequelize, DataTypes } = require('sequelize');
 
-const sequelize = new Sequelize(DB_URL, {
+// Usando a URL de conexão do banco de dados do Render
+const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: 'postgres',
   protocol: 'postgres',
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false,  // Necessário para conexões seguras com Render
+    },
+  },
 });
+
+// Teste de conexão com o banco de dados
+sequelize.authenticate()
+  .then(() => {
+    console.log('Conexão com o banco de dados bem-sucedida.');
+  })
+  .catch(err => {
+    console.error('Erro ao conectar ao banco de dados:', err);
+  });
 
 
 

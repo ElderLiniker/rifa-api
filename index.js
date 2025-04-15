@@ -1,32 +1,26 @@
 const express = require("express");
 const cors = require("cors");
-
-require("dotenv").config(); // Carrega as variáveis de ambiente
+require("dotenv").config();
 
 const app = express();
-const port = process.env.PORT || 8080; // Altere o valor para 8080 diretamente, se a plataforma usar esta porta.
+const port = process.env.PORT || 8080;
 
-
-// Habilitando CORS
 app.use(cors());
-app.use(express.json()); // Para analisar corpos JSON
+app.use(express.json());
 
-// Configuração do Sequelize e conexão com o PostgreSQL
 const { Sequelize, DataTypes } = require("sequelize");
 
-// Usando a URL de conexão do banco de dados do Render
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: "postgres",
   protocol: "postgres",
   dialectOptions: {
     ssl: {
       require: true,
-      rejectUnauthorized: false, // Necessário para conexões seguras com Render
+      rejectUnauthorized: false,
     },
   },
 });
 
-// Teste de conexão com o banco de dados
 sequelize.authenticate()
   .then(() => {
     console.log("Conexão com o banco de dados bem-sucedida.");
@@ -35,7 +29,6 @@ sequelize.authenticate()
     console.error("Erro ao conectar ao banco de dados:", err);
   });
 
-// Modelos para as reservas e configurações
 const Reserva = sequelize.define("Reserva", {
   numero: {
     type: DataTypes.STRING,
@@ -53,7 +46,36 @@ const Configuracao = sequelize.define("Configuracao", {
   valor: DataTypes.STRING,
 });
 
-// Rota para configurar o valor da rifa e prêmio
+// 🔐 Rota de login do admin
+app.post("/admin/login", (req, res) => {
+  const { senha } = req.body;
+
+  if (senha === process.env.ADMIN_SENHA) {
+    res.json({ autorizado: true, message: "Acesso autorizado" });
+  } else {
+    res.status(401).json({ autorizado: false, message: "Senha incorreta" });
+  }
+});
+
+// 🔒 Protegendo configuração de rifa
+app.put("/configuracoes", async (req, res) => {
+  const { rifa, premio, senha } = req.body;
+
+  if (senha !== process.env.ADMIN_SENHA) {
+    return res.status(401).json({ message: "Acesso negado" });
+  }
+
+  try {
+    if (rifa) await Configuracao.upsert({ tipo: "rifa", valor: rifa });
+    if (premio) await Configuracao.upsert({ tipo: "premio", valor: premio });
+
+    res.json({ message: "Configurações atualizadas com sucesso!" });
+  } catch (error) {
+    console.error("Erro ao atualizar configurações:", error);
+    res.status(500).json({ message: "Erro ao atualizar configurações" });
+  }
+});
+
 app.get("/configuracoes", async (req, res) => {
   try {
     const configuracoes = await Configuracao.findAll();
@@ -68,26 +90,6 @@ app.get("/configuracoes", async (req, res) => {
   }
 });
 
-app.put("/configuracoes", async (req, res) => {
-  const { rifa, premio } = req.body;
-
-  try {
-    if (rifa) {
-      await Configuracao.upsert({ tipo: "rifa", valor: rifa });
-    }
-
-    if (premio) {
-      await Configuracao.upsert({ tipo: "premio", valor: premio });
-    }
-
-    res.json({ message: "Configurações atualizadas com sucesso!" });
-  } catch (error) {
-    console.error("Erro ao atualizar configurações:", error);
-    res.status(500).json({ message: "Erro ao atualizar configurações" });
-  }
-});
-
-// Rota para reservar números
 app.post("/reservas", async (req, res) => {
   const { nome, numeros } = req.body;
 
@@ -103,7 +105,6 @@ app.post("/reservas", async (req, res) => {
   }
 });
 
-// Rota para obter as reservas
 app.get("/reservas", async (req, res) => {
   try {
     const reservas = await Reserva.findAll();
@@ -114,8 +115,14 @@ app.get("/reservas", async (req, res) => {
   }
 });
 
-// Rota para limpar todas as reservas
+// 🔒 Protegendo exclusão de reservas com senha de admin
 app.delete("/reservas", async (req, res) => {
+  const { senha } = req.body;
+
+  if (senha !== process.env.ADMIN_SENHA) {
+    return res.status(401).json({ message: "Acesso negado" });
+  }
+
   try {
     await Reserva.destroy({ where: {} });
     res.json({ message: "Rifa limpa com sucesso!" });
@@ -125,7 +132,6 @@ app.delete("/reservas", async (req, res) => {
   }
 });
 
-// Iniciando o servidor
 app.listen(port, () => {
   console.log(`API rodando em http://localhost:${port}`);
 });

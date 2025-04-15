@@ -4,7 +4,8 @@ const cors = require("cors");
 require("dotenv").config(); // Carrega as variáveis de ambiente
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080; // Altere o valor para 8080 diretamente, se a plataforma usar esta porta.
+
 
 // Habilitando CORS
 app.use(cors());

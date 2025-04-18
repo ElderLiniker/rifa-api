@@ -46,21 +46,19 @@ const Configuracao = sequelize.define("Configuracao", {
   valor: DataTypes.STRING,
 });
 
-// 🔐 Rota de login do admin
+// 🔐 Login de admin
 app.post("/admin/login", (req, res) => {
   const { senha } = req.body;
-
   if (senha === process.env.ADMIN_SENHA) {
-    res.json({ autorizado: true, message: "Acesso autorizado" });
+    res.json({ autorizado: true });
   } else {
-    res.status(401).json({ autorizado: false, message: "Senha incorreta" });
+    res.status(401).json({ autorizado: false });
   }
 });
 
-// 🔒 Protegendo configuração de rifa
+// Atualizar configurações
 app.put("/configuracoes", async (req, res) => {
   const { rifa, premio, senha } = req.body;
-
   if (senha !== process.env.ADMIN_SENHA) {
     return res.status(401).json({ message: "Acesso negado" });
   }
@@ -68,7 +66,6 @@ app.put("/configuracoes", async (req, res) => {
   try {
     if (rifa) await Configuracao.upsert({ tipo: "rifa", valor: rifa });
     if (premio) await Configuracao.upsert({ tipo: "premio", valor: premio });
-
     res.json({ message: "Configurações atualizadas com sucesso!" });
   } catch (error) {
     console.error("Erro ao atualizar configurações:", error);
@@ -90,6 +87,7 @@ app.get("/configuracoes", async (req, res) => {
   }
 });
 
+// Criar reservas
 app.post("/reservas", async (req, res) => {
   const { nome, numeros } = req.body;
 
@@ -97,7 +95,6 @@ app.post("/reservas", async (req, res) => {
     for (let numero of numeros) {
       await Reserva.create({ numero, nome });
     }
-
     res.status(201).json({ message: "Reserva feita com sucesso!" });
   } catch (error) {
     console.error("Erro ao fazer reserva:", error);
@@ -105,6 +102,7 @@ app.post("/reservas", async (req, res) => {
   }
 });
 
+// Buscar reservas
 app.get("/reservas", async (req, res) => {
   try {
     const reservas = await Reserva.findAll();
@@ -115,10 +113,9 @@ app.get("/reservas", async (req, res) => {
   }
 });
 
-// 🔒 Protegendo exclusão de reservas com senha de admin
+// Limpar todas as reservas (admin)
 app.delete("/reservas", async (req, res) => {
   const { senha } = req.body;
-
   if (senha !== process.env.ADMIN_SENHA) {
     return res.status(401).json({ message: "Acesso negado" });
   }
@@ -129,6 +126,57 @@ app.delete("/reservas", async (req, res) => {
   } catch (error) {
     console.error("Erro ao limpar rifa:", error);
     res.status(500).json({ message: "Erro ao limpar rifa" });
+  }
+});
+
+// ✅ Excluir reserva individual
+app.delete("/reservas/:numero", async (req, res) => {
+  const { numero } = req.params;
+
+  try {
+    const deleted = await Reserva.destroy({ where: { numero } });
+    if (deleted) {
+      res.json({ message: "Número excluído com sucesso." });
+    } else {
+      res.status(404).json({ message: "Número não encontrado." });
+    }
+  } catch (error) {
+    console.error("Erro ao excluir número:", error);
+    res.status(500).json({ message: "Erro ao excluir número." });
+  }
+});
+
+// ✅ Marcar como pago
+app.put("/reservas/:numero/pago", async (req, res) => {
+  const { numero } = req.params;
+  try {
+    const reserva = await Reserva.findOne({ where: { numero } });
+    if (!reserva) {
+      return res.status(404).json({ message: "Reserva não encontrada" });
+    }
+    reserva.pago = true;
+    await reserva.save();
+    res.json({ message: "Marcado como pago com sucesso" });
+  } catch (error) {
+    console.error("Erro ao marcar como pago:", error);
+    res.status(500).json({ message: "Erro ao marcar como pago" });
+  }
+});
+
+// ✅ Marcar como não pago
+app.put("/reservas/:numero/nao-pago", async (req, res) => {
+  const { numero } = req.params;
+  try {
+    const reserva = await Reserva.findOne({ where: { numero } });
+    if (!reserva) {
+      return res.status(404).json({ message: "Reserva não encontrada" });
+    }
+    reserva.pago = false;
+    await reserva.save();
+    res.json({ message: "Marcado como não pago com sucesso" });
+  } catch (error) {
+    console.error("Erro ao marcar como não pago:", error);
+    res.status(500).json({ message: "Erro ao marcar como não pago" });
   }
 });
 

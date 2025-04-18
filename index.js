@@ -132,6 +132,54 @@ app.delete("/reservas", async (req, res) => {
   }
 });
 
+// Novo endpoint para excluir uma reserva individual
+app.delete("/reservas/:numero", async (req, res) => {
+  const { numero } = req.params;
+  try {
+    await Reserva.destroy({ where: { numero } });
+    res.status(200).json({ message: 'Reserva excluída com sucesso' });
+  } catch (error) {
+    console.error('Erro ao excluir a reserva:', error);
+    res.status(500).json({ message: 'Erro ao excluir a reserva' });
+  }
+});
+
+// Endpoint para marcar como pago
+app.put('/reservas/:numero/pago', async (req, res) => {
+  const { numero } = req.params;
+  try {
+    const reserva = await Reserva.findOne({ where: { numero } });
+    if (reserva) {
+      reserva.pago = true;
+      await reserva.save();
+      res.status(200).json({ message: 'Reserva marcada como paga' });
+    } else {
+      res.status(404).json({ message: 'Reserva não encontrada' });
+    }
+  } catch (error) {
+    console.error('Erro ao marcar como pago:', error);
+    res.status(500).json({ message: 'Erro ao marcar como pago' });
+  }
+});
+
+// Endpoint para marcar como não pago
+app.put('/reservas/:numero/nao-pago', async (req, res) => {
+  const { numero } = req.params;
+  try {
+    const reserva = await Reserva.findOne({ where: { numero } });
+    if (reserva) {
+      reserva.pago = false;
+      await reserva.save();
+      res.status(200).json({ message: 'Reserva marcada como não paga' });
+    } else {
+      res.status(404).json({ message: 'Reserva não encontrada' });
+    }
+  } catch (error) {
+    console.error('Erro ao marcar como não pago:', error);
+    res.status(500).json({ message: 'Erro ao marcar como não pago' });
+  }
+});
+
 app.listen(port, () => {
   console.log(`API rodando em http://localhost:${port}`);
 });

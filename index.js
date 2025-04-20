@@ -114,23 +114,64 @@ app.get("/reservas", async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar reservas" });
   }
 });
+app.put("/reservas/:numero/pago", async (req, res) => {
+  const { numero } = req.params;
+
+  try {
+    const reserva = await Reserva.findOne({ where: { numero } });
+    if (!reserva) return res.status(404).json({ message: "Reserva não encontrada" });
+
+    reserva.pago = true;
+    await reserva.save();
+
+    res.json({ message: "Número marcado como pago!" });
+  } catch (error) {
+    console.error("Erro ao marcar como pago:", error);
+    res.status(500).json({ message: "Erro ao marcar como pago" });
+  }
+});
+
+app.put("/reservas/:numero/nao-pago", async (req, res) => {
+  const { numero } = req.params;
+
+  try {
+    const reserva = await Reserva.findOne({ where: { numero } });
+    if (!reserva) return res.status(404).json({ message: "Reserva não encontrada" });
+
+    reserva.pago = false;
+    await reserva.save();
+
+    res.json({ message: "Número marcado como não pago!" });
+  } catch (error) {
+    console.error("Erro ao marcar como não pago:", error);
+    res.status(500).json({ message: "Erro ao marcar como não pago" });
+  }
+});
+
 
 // 🔒 Protegendo exclusão de reservas com senha de admin
-app.delete("/reservas", async (req, res) => {
+app.delete("/reservas/:numero", async (req, res) => {
   const { senha } = req.body;
+  const { numero } = req.params;
 
   if (senha !== process.env.ADMIN_SENHA) {
     return res.status(401).json({ message: "Acesso negado" });
   }
 
   try {
-    await Reserva.destroy({ where: {} });
-    res.json({ message: "Rifa limpa com sucesso!" });
+    const deletado = await Reserva.destroy({ where: { numero } });
+
+    if (deletado === 0) {
+      return res.status(404).json({ message: "Número não encontrado" });
+    }
+
+    res.json({ message: `Número ${numero} excluído com sucesso!` });
   } catch (error) {
-    console.error("Erro ao limpar rifa:", error);
-    res.status(500).json({ message: "Erro ao limpar rifa" });
+    console.error("Erro ao excluir número:", error);
+    res.status(500).json({ message: "Erro ao excluir número" });
   }
 });
+
 
 app.listen(port, () => {
   console.log(`API rodando em http://localhost:${port}`);

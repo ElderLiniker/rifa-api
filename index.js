@@ -171,6 +171,28 @@ app.delete("/reservas/:numero", async (req, res) => {
     res.status(500).json({ message: "Erro ao excluir número" });
   }
 });
+app.delete("/reservas", async (req, res) => {
+  const { senha } = req.body;
+
+  if (senha !== process.env.ADMIN_SENHA) {
+    return res.status(401).json({ message: "Acesso negado" });
+  }
+
+  try {
+    // Deletando todos os registros de reservas
+    const deletado = await Reserva.destroy({ where: {} });
+
+    if (deletado === 0) {
+      return res.status(404).json({ message: "Nenhum número encontrado para excluir" });
+    }
+
+    res.json({ message: "Rifa limpa com sucesso!" });
+  } catch (error) {
+    console.error("Erro ao limpar rifa:", error);
+    res.status(500).json({ message: "Erro ao limpar rifa" });
+  }
+});
+
 
 
 app.listen(port, () => {

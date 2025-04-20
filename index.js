@@ -131,6 +131,17 @@ app.put("/reservas/:numero/pago", async (req, res) => {
   }
 });
 
+app.get("/api/verificar-admin", (req, res) => {
+  const senha = req.headers.authorization;
+
+  if (senha === process.env.ADMIN_SENHA) {
+    res.sendStatus(200); // Autorizado
+  } else {
+    res.sendStatus(401); // Não autorizado
+  }
+});
+
+
 app.put("/reservas/:numero/nao-pago", async (req, res) => {
   const { numero } = req.params;
 

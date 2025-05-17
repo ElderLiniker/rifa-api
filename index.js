@@ -1,211 +1,90 @@
-const express = require("express");
-const cors = require("cors");
 require("dotenv").config();
+const express   = require("express");
+const cors      = require("cors");
+const { Sequelize, DataTypes } = require("sequelize");
 
-const app = express();
+const app  = express();
 const port = process.env.PORT || 8080;
 
 app.use(cors());
 app.use(express.json());
 
-const { Sequelize, DataTypes } = require("sequelize");
-
+// ── Conexão ────────────────────────────────────────
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: "postgres",
   protocol: "postgres",
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false,
-    },
-  },
+  dialectOptions: { ssl: { require: true, rejectUnauthorized: false } }
 });
-
 sequelize.authenticate()
-  .then(() => {
-    console.log("Conexão com o banco de dados bem-sucedida.");
-  })
-  .catch((err) => {
-    console.error("Erro ao conectar ao banco de dados:", err);
-  });
+  .then(() => console.log("🔥  Banco conectado"))
+  .catch(err  => console.error("❌  Falha ao conectar:", err));
 
+// ── Models ─────────────────────────────────────────
 const Reserva = sequelize.define("Reserva", {
-  numero: {
-    type: DataTypes.STRING,
-    unique: true,
-  },
-  nome: DataTypes.STRING,
-  pago: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
-  },
+  numero: { type: DataTypes.STRING, primaryKey: true },
+  nome  : DataTypes.STRING,
+  pago  : { type: DataTypes.BOOLEAN, defaultValue: false }
 });
 
 const Configuracao = sequelize.define("Configuracao", {
-  tipo: DataTypes.STRING,
-  valor: DataTypes.STRING,
+  tipo : { type: DataTypes.STRING, primaryKey: true }, // "rifa" | "premio"
+  valor: DataTypes.STRING
 });
 
-// 🔐 Rota de login do admin
-app.post("/admin/login", (req, res) => {
-  const { senha } = req.body;
+sequelize.sync();   // cria tabelas se não existirem
 
-  if (senha === process.env.ADMIN_SENHA) {
-    res.json({ autorizado: true, message: "Acesso autorizado" });
-  } else {
-    res.status(401).json({ autorizado: false, message: "Senha incorreta" });
-  }
+// ── Middleware de admin (senha no header Authorization) ─
+function authAdmin(req, res, next) {
+  const senha = req.headers.authorization || req.body.senha;
+  if (senha === process.env.ADMIN_SENHA) return next();
+  res.status(401).json({ message: "Acesso negado" });
+}
+
+// ── Configurações rifa / prêmio ───────────────────
+app.get("/configuracoes", async (_, res) => {
+  const pares = await Configuracao.findAll();
+  res.json(Object.fromEntries(pares.map(p => [p.tipo, p.valor])));
 });
 
-// 🔒 Protegendo configuração de rifa
-app.put("/configuracoes", async (req, res) => {
-  const { rifa, premio, senha } = req.body;
-
-  if (senha !== process.env.ADMIN_SENHA) {
-    return res.status(401).json({ message: "Acesso negado" });
-  }
-
-  try {
-    if (rifa) await Configuracao.upsert({ tipo: "rifa", valor: rifa });
-    if (premio) await Configuracao.upsert({ tipo: "premio", valor: premio });
-
-    res.json({ message: "Configurações atualizadas com sucesso!" });
-  } catch (error) {
-    console.error("Erro ao atualizar configurações:", error);
-    res.status(500).json({ message: "Erro ao atualizar configurações" });
-  }
+app.put("/configuracoes", authAdmin, async (req, res) => {
+  const { rifa, premio } = req.body;
+  if (rifa   !== undefined) await Configuracao.upsert({ tipo: "rifa",   valor: rifa   });
+  if (premio !== undefined) await Configuracao.upsert({ tipo: "premio", valor: premio });
+  res.json({ message: "Configurações atualizadas" });
 });
 
-app.get("/configuracoes", async (req, res) => {
-  try {
-    const configuracoes = await Configuracao.findAll();
-    const configObj = {};
-    configuracoes.forEach((config) => {
-      configObj[config.tipo] = config.valor;
-    });
-    res.json(configObj);
-  } catch (error) {
-    console.error("Erro ao carregar configurações:", error);
-    res.status(500).json({ message: "Erro ao carregar configurações" });
-  }
-});
-
+// ── Reservas ───────────────────────────────────────
 app.post("/reservas", async (req, res) => {
   const { nome, numeros } = req.body;
-
   try {
-    for (let numero of numeros) {
-      await Reserva.create({ numero, nome });
-    }
-
-    res.status(201).json({ message: "Reserva feita com sucesso!" });
-  } catch (error) {
-    console.error("Erro ao fazer reserva:", error);
-    res.status(500).json({ message: "Erro ao fazer reserva" });
-  }
+    await Promise.all(numeros.map(n => Reserva.create({ numero: n, nome })));
+    res.status(201).json({ message: "Reserva feita!" });
+  } catch (e) { res.status(500).json({ message: "Erro ao reservar" }); }
 });
 
-app.get("/reservas", async (req, res) => {
-  try {
-    const reservas = await Reserva.findAll();
-    res.json(reservas);
-  } catch (error) {
-    console.error("Erro ao buscar reservas:", error);
-    res.status(500).json({ message: "Erro ao buscar reservas" });
-  }
+app.get("/reservas", async (_, res) => res.json(await Reserva.findAll()));
+
+app.put("/reservas/:numero/pago",    async (req,res)=>togglePago(req,res,true));
+app.put("/reservas/:numero/nao-pago",async (req,res)=>togglePago(req,res,false));
+async function togglePago(req,res,flag){
+  const r=await Reserva.findByPk(req.params.numero);
+  if(!r) return res.status(404).json({message:"Não encontrado"});
+  r.pago=flag; await r.save(); res.json({message:"Atualizado"});
+}
+
+app.delete("/reservas/:numero", authAdmin, async (req,res)=>{
+  const del=await Reserva.destroy({ where:{ numero:req.params.numero }});
+  if(!del) return res.status(404).json({message:"Não encontrado"});
+  res.json({message:"Excluído"});
 });
-app.put("/reservas/:numero/pago", async (req, res) => {
-  const { numero } = req.params;
-
-  try {
-    const reserva = await Reserva.findOne({ where: { numero } });
-    if (!reserva) return res.status(404).json({ message: "Reserva não encontrada" });
-
-    reserva.pago = true;
-    await reserva.save();
-
-    res.json({ message: "Número marcado como pago!" });
-  } catch (error) {
-    console.error("Erro ao marcar como pago:", error);
-    res.status(500).json({ message: "Erro ao marcar como pago" });
-  }
+app.delete("/reservas", authAdmin, async (_,res)=>{
+  await Reserva.destroy({ where:{}});
+  res.json({message:"Rifa limpa"});
 });
 
-app.get("/api/verificar-admin", (req, res) => {
-  const senha = req.headers.authorization;
-
-  if (senha === process.env.ADMIN_SENHA) {
-    res.sendStatus(200); // Autorizado
-  } else {
-    res.sendStatus(401); // Não autorizado
-  }
+// ── Login admin (opcional: guarda senha no cliente) ─
+app.post("/admin/login", (req,res)=>{
+  res.json({ autorizado: req.body.senha === process.env.ADMIN_SENHA });
 });
 
-
-app.put("/reservas/:numero/nao-pago", async (req, res) => {
-  const { numero } = req.params;
-
-  try {
-    const reserva = await Reserva.findOne({ where: { numero } });
-    if (!reserva) return res.status(404).json({ message: "Reserva não encontrada" });
-
-    reserva.pago = false;
-    await reserva.save();
-
-    res.json({ message: "Número marcado como não pago!" });
-  } catch (error) {
-    console.error("Erro ao marcar como não pago:", error);
-    res.status(500).json({ message: "Erro ao marcar como não pago" });
-  }
-});
-
-
-// 🔒 Protegendo exclusão de reservas com senha de admin
-app.delete("/reservas/:numero", async (req, res) => {
-  const { senha } = req.body;
-  const { numero } = req.params;
-
-  if (senha !== process.env.ADMIN_SENHA) {
-    return res.status(401).json({ message: "Acesso negado" });
-  }
-
-  try {
-    const deletado = await Reserva.destroy({ where: { numero } });
-
-    if (deletado === 0) {
-      return res.status(404).json({ message: "Número não encontrado" });
-    }
-
-    res.json({ message: `Número ${numero} excluído com sucesso!` });
-  } catch (error) {
-    console.error("Erro ao excluir número:", error);
-    res.status(500).json({ message: "Erro ao excluir número" });
-  }
-});
-app.delete("/reservas", async (req, res) => {
-  const { senha } = req.body;
-
-  if (senha !== process.env.ADMIN_SENHA) {
-    return res.status(401).json({ message: "Acesso negado" });
-  }
-
-  try {
-    // Deletando todos os registros de reservas
-    const deletado = await Reserva.destroy({ where: {} });
-
-    if (deletado === 0) {
-      return res.status(404).json({ message: "Nenhum número encontrado para excluir" });
-    }
-
-    res.json({ message: "Rifa limpa com sucesso!" });
-  } catch (error) {
-    console.error("Erro ao limpar rifa:", error);
-    res.status(500).json({ message: "Erro ao limpar rifa" });
-  }
-});
-
-
-
-app.listen(port, () => {
-  console.log(`API rodando em http://localhost:${port}`);
-});
+app.listen(port, ()=>console.log(`🚀  API http://localhost:${port}`));

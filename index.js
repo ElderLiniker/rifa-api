@@ -61,13 +61,6 @@ app.post("/admin/login", (req, res) => {
 app.put("/configuracoes", async (req, res) => {
   const { rifa, premio, senha } = req.body;
 
-  app.put("/configuracoes", authAdmin, async (req, res) => {
-  const { rifa, premio } = req.body;
-  if (rifa   !== undefined) await Configuracao.upsert({ tipo: "rifa",   valor: rifa   });
-  if (premio !== undefined) await Configuracao.upsert({ tipo: "premio", valor: premio });
-  res.json({ message: "Configurações atualizadas" });
-});
-
   if (senha !== process.env.ADMIN_SENHA) {
     return res.status(401).json({ message: "Acesso negado" });
   }

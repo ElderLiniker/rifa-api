@@ -45,6 +45,23 @@ const Configuracao = sequelize.define("Configuracao", {
   tipo: DataTypes.STRING,
   valor: DataTypes.STRING,
 });
+app.post("/api/rifa", async (req, res) => {
+  const { rifa } = req.body;
+
+  if (!rifa || typeof rifa !== "string" || rifa.trim() === "") {
+    return res.status(400).json({ message: "Nome da rifa inválido" });
+  }
+
+  try {
+    // Upsert salva se já existir, ou cria novo
+    await Configuracao.upsert({ tipo: "rifa", valor: rifa.trim() });
+    res.json({ message: "Rifa salva com sucesso", rifa: rifa.trim() });
+  } catch (error) {
+    console.error("Erro ao salvar rifa:", error);
+    res.status(500).json({ message: "Erro ao salvar rifa" });
+  }
+});
+
 
 // 🔐 Rota de login do admin
 app.post("/admin/login", (req, res) => {

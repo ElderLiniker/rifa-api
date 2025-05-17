@@ -8,6 +8,12 @@ const port = process.env.PORT || 8080;
 app.use(cors());
 app.use(express.json());
 
+
+let rifa = "";
+let premio = "";
+
+
+
 const { Sequelize, DataTypes } = require("sequelize");
 
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
@@ -44,6 +50,35 @@ const Reserva = sequelize.define("Reserva", {
 const Configuracao = sequelize.define("Configuracao", {
   tipo: DataTypes.STRING,
   valor: DataTypes.STRING,
+});
+
+
+
+
+// Rota para setar o valor da rifa
+app.post("/api/rifa", (req, res) => {
+  const { valor } = req.body;
+  if (!valor) return res.status(400).json({ error: "Valor da rifa é obrigatório." });
+  rifa = valor;
+  res.json({ message: "Rifa atualizada com sucesso!", rifa });
+});
+
+// Rota para pegar o valor da rifa
+app.get("/api/rifa", (req, res) => {
+  res.json({ rifa });
+});
+
+// Rota para setar o valor do prêmio
+app.post("/api/premio", (req, res) => {
+  const { valor } = req.body;
+  if (!valor) return res.status(400).json({ error: "Valor do prêmio é obrigatório." });
+  premio = valor;
+  res.json({ message: "Prêmio atualizado com sucesso!", premio });
+});
+
+// Rota para pegar o valor do prêmio
+app.get("/api/premio", (req, res) => {
+  res.json({ premio });
 });
 
 // 🔐 Rota de login do admin
